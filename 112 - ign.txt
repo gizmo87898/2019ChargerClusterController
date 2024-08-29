@@ -3,26 +3,66 @@
 12c - power steering?
 135 - cc
 178 - trans too hot and other messages
-180 battery light??
+b2b4: press brake and push button to shift into gear
+180 battery light
+b5b22:battery light
 183 beep?
 1d0 - airbag
 201 - gas level??? made it go white then back to ywellow
 22d - steering wheel controls
-22f - messages
+22f - performance limited, only press one pedal
 248 - battery savcer on
+270 - sportmode
+b4b2:sport
 271 - secure park
 280 - memeory 1/2
 2a0 - oil temp, mil
+b0b1:mil
+b0b2: mil blink
+b0b4: service electronic throttle control
+b4 oil temp
+0x0 - -40F
+0x64 - 159F -100
+0x9c - 240F -- 156
+0xc8 - 320F -200
 2bf - autoshift or something?
 2d0 - blindspot alert
 2e0 - esc
+b6b8: tc off
+b6b64:tc off and traction control sport
+b7b4:abs fault
+b7b8:abs active
+b7b16: service esc
+b7b32: brake light
 2f0 - memory
 304 - tpms
-320 - idk
-324 - lights out in front
+308 - awd system fault
+30b - oil change reqd
+31f - service rain sensing wipers
+324 - turn signal lights out in front and back
+330 - tc light goes out - timer?
 334 - lights
-33a - auto highbeams
+b0b4:foglights
+b1b64:auto highbeams
+b2b1:parkinglights
+b2b2:driver door
+b2b4: pass door
+b2b8: driver rear door
+b2b16: pass rear door
+b2b64: trunk
+b2b128: park brake engaged
+b3b16: plant mode
+b3b32 - ship mode
+b3b64 - left directrional
+b4b128 - -right dir
+b6:backlight brightness
+b7b4:fullbeam
+b7b64:brake fluid low
+b7b128:washer fluid low
+381 - gear selector showed, and trans blew up faults
+b0b4:lane departure warning (going off to right)
 382 - lanesense
 39c - keyfob errors
-3c9 - outside temp3e1 - press brake to start
+3c9 - outside temp\
+3e1 - press brake to start
 3ea - cc off

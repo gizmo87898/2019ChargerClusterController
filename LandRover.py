@@ -9,7 +9,7 @@ import tkinter as tk
 import win_precise_time as wpt
 from datetime import datetime
 
-bus = can.interface.Bus(channel='com8', bustype='seeedstudio', bitrate=500000)
+bus = can.interface.Bus(channel='com7', bustype='seeedstudio', bitrate=500000)
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(('127.0.0.1', 4567))
     
@@ -18,7 +18,7 @@ start_time_100ms = time.time()
 start_time_10ms = time.time()
 start_time_5s = time.time()
 
-id_counter = 0x0
+id_counter = 0
 counter_4bit = 0
 
 ignition = True
@@ -75,22 +75,37 @@ def gui_thread():
     root = tk.Tk()
     root.title("LandRoverLR2")
 
-    button_right = tk.Button(root, text="Right")
-    button_right.bind("<ButtonPress>", lambda event: set_steering_wheel_data([0,0,0,0,0,0b00000001,0,0]))
-    button_right.bind("<ButtonRelease>", reset_steering_wheel_data)
-    button_right.pack()
+    # Configure grid layout
+    root.grid_rowconfigure(1, weight=1)
+    root.grid_columnconfigure(1, weight=1)
+
+    # Buttons arranged in their natural positions
+    button_up = tk.Button(root, text="Up")
+    button_up.bind("<ButtonPress>", lambda event: set_steering_wheel_data([0, 0, 0, 0, 0, 0b00000100, 0, 0]))
+    button_up.bind("<ButtonRelease>", reset_steering_wheel_data)
+    button_up.grid(row=0, column=1, padx=5, pady=5)
+
+    button_left = tk.Button(root, text="Left")
+    button_left.bind("<ButtonPress>", lambda event: set_steering_wheel_data([0, 0, 0, 0, 0b00010000, 0, 0, 0]))
+    button_left.bind("<ButtonRelease>", reset_steering_wheel_data)
+    button_left.grid(row=1, column=0, padx=5, pady=5)
 
     button_ok = tk.Button(root, text="OK")
-    button_ok.bind("<ButtonPress>", lambda event: set_steering_wheel_data([0,0,0,0,0,0b00010000,0,0]))
+    button_ok.bind("<ButtonPress>", lambda event: set_steering_wheel_data([0, 0, 0, 0, 0, 0b00010000, 0, 0]))
     button_ok.bind("<ButtonRelease>", reset_steering_wheel_data)
-    button_ok.pack()
+    button_ok.grid(row=1, column=1, padx=5, pady=5)
 
-    button_up = tk.Button(root, text="Up")
-    button_up.bind("<ButtonPress>", lambda event: set_steering_wheel_data([0,0,0,0,0,0b00000100,0,0]))
-    button_up.bind("<ButtonRelease>", reset_steering_wheel_data)
-    button_up.pack()
+    button_right = tk.Button(root, text="Right")
+    button_right.bind("<ButtonPress>", lambda event: set_steering_wheel_data([0, 0, 0, 0, 0, 0b00000001, 0, 0]))
+    button_right.bind("<ButtonRelease>", reset_steering_wheel_data)
+    button_right.grid(row=1, column=2, padx=5, pady=5)
+
+    button_down = tk.Button(root, text="Down")
+    button_down.bind("<ButtonPress>", lambda event: set_steering_wheel_data([0, 0, 0, 0, 0b01000000, 0, 0, 0]))
+    button_down.bind("<ButtonRelease>", reset_steering_wheel_data)
+    button_down.grid(row=2, column=1, padx=5, pady=5)
+
     root.mainloop()
-
 # Start the GUI thread
 gui_thread = threading.Thread(target=gui_thread)
 gui_thread.start()
@@ -125,20 +140,20 @@ while True:
         shiftlight = (packet[10]>>0) & 1
         highbeam = (packet[10]>>1) & 1
         handbrake = (packet[10]>>2) & 1
-        tc_active = (packet[10]>>4) & 1
-        tc_off = (packet[10]>>5) & 1
-        left_directional = (packet[10]>>6) & 1
-        right_directional = (packet[10]>>7) & 1
-        lowoilpressure = (packet[10]>>8) & 1
-        battery = (packet[10]>>9) & 1
-        abs_active = (packet[10]>>10) & 1
-        abs_fault = (packet[10]>>11) & 1
-        ignition = True
-        lowpressure = (packet[10]>>13) & 1
-        check_engine = (packet[10]>>14) & 1
-        foglight = (packet[10]>>15) & 1
-        lowbeam = (packet[10]>>16) & 1
-        cruise_control_active = (packet[10]>>17) & 1
+        tc_active = (packet[10]>>3) & 1
+        tc_off = (packet[10]>>4) & 1
+        left_directional = (packet[10]>>5) & 1
+        right_directional = (packet[10]>>6) & 1
+        lowoilpressure = (packet[10]>>7) & 1
+        battery = (packet[10]>>8) & 1
+        abs_active = (packet[10]>>9) & 1
+        abs_fault = False
+        ignition = (packet[10]>>11) & 1
+        lowpressure = (packet[10]>>12) & 1
+        check_engine = (packet[10]>>13) & 1
+        foglight = (packet[10]>>14) & 1
+        lowbeam = (packet[10]>>15) & 1
+        cruise_control_active = (packet[10]>>16) & 1
     
     # Send each message every 100ms
     elapsed_time_100ms = current_time - start_time_100ms
@@ -160,6 +175,16 @@ while True:
                 ignition*0x4,0,0,0,0,0,0,0], is_extended_id=False),
             can.Message(arbitration_id=0x1d0, data=[ # airbag
                 0,0,0,0,0,0,0,0], is_extended_id=False),
+            can.Message(arbitration_id=0x180, data=[ # battery light
+                0,0,0,0,0,0,0,0], is_extended_id=False),
+            can.Message(arbitration_id=0x2e0, data=[ # esc
+                0,0,0,0,0,0,tc_off*8,(abs_active*8)+(not abs_fault*4)], is_extended_id=False),
+            can.Message(arbitration_id=0x330, data=[ # tc
+                0,0,0,0,0,0,0,0], is_extended_id=False),
+            can.Message(arbitration_id=0x2a0, data=[ # mil
+                check_engine,0,0,id_counter,0,0,0,0], is_extended_id=False),
+            can.Message(arbitration_id=0x334, data=[ # lights
+                foglight*4,0,handbrake*128,(left_directional*64)+(right_directional*128),0,0,240,highbeam*4], is_extended_id=False),
             can.Message(arbitration_id=id_counter, data=[
                 random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255)], is_extended_id=False),
         ]
@@ -193,12 +218,13 @@ while True:
 
     # Execute code every 5s
     elapsed_time_5s = current_time - start_time_5s
-    if elapsed_time_5s >= 3:
+    if elapsed_time_5s >= 1:
         id_counter += 1
+        #get message id counter, change it to zero, randomize the correct bit, after 3 seconds of brutefocing make it change it to the next bit
         print(hex(id_counter))
         if id_counter == 0x7ff:
             id_counter = 0
-
+        
         start_time_5s = time.time()
 
 receive_thread.join()
