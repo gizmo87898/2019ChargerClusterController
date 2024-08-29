@@ -1,0 +1,28 @@
+112 - ign
+11c - speed
+12c - power steering?
+135 - cc
+178 - trans too hot and other messages
+180 battery light??
+183 beep?
+1d0 - airbag
+201 - gas level??? made it go white then back to ywellow
+22d - steering wheel controls
+22f - messages
+248 - battery savcer on
+271 - secure park
+280 - memeory 1/2
+2a0 - oil temp, mil
+2bf - autoshift or something?
+2d0 - blindspot alert
+2e0 - esc
+2f0 - memory
+304 - tpms
+320 - idk
+324 - lights out in front
+334 - lights
+33a - auto highbeams
+382 - lanesense
+39c - keyfob errors
+3c9 - outside temp3e1 - press brake to start
+3ea - cc off
