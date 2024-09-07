@@ -159,20 +159,11 @@ def format_text_to_can_chunks(text, input):
     return can_chunks
 
 def send_can_messages(bus, can_id, chunks):
-    """
-    Send a list of CAN messages on a specific CAN ID.
-    
-    Args:
-        bus (can.Bus): The CAN bus instance.
-        can_id (int): The CAN ID to use for sending messages.
-        chunks (list): A list of 8-byte chunks to be sent.
-    """
     for chunk in chunks:
         message = can.Message(arbitration_id=can_id, data=chunk, is_extended_id=False)
         try:
             bus.send(message)
-
-            print(f"Message sent: {message}")
+            wpt.sleep(0.001)
         except can.CanError as e:
             print(f"Failed to send message: {e}")
 
@@ -180,17 +171,14 @@ def send_display_text(bus, text, text_type='artist'):
 
     if text_type == 'artist':
         start_byte = 0x02  # Artist
-    elif text_type == 'song':
+    elif text_type == 'song' or "title":
         start_byte = 0x03  # Song Title
     elif text_type == 'input':
         start_byte = 0x01  # Radio Input Name
     else:
         raise ValueError("Invalid text type. Use 'artist', 'song', or 'input'.")
-    
-    # Format the text into CAN message chunks
+
     can_chunks = format_text_to_can_chunks(text, start_byte)
-    
-    # Send the formatted CAN messages
     send_can_messages(bus, 0x328, can_chunks)
 
 
@@ -248,13 +236,11 @@ while True:
     elapsed_time_100ms = current_time - start_time_100ms
     if elapsed_time_100ms >= 0.1:
         date = datetime.now()
+
         send_display_text(bus, "EyePhone69", text_type="input")
         send_display_text(bus, "NiggasAndJews", text_type="song")
 
-
         messages_100ms = [
-            
-
             can.Message(arbitration_id=0x112, data=[ # ign
                 (ignition*0x4)+0b10000000,0], is_extended_id=False),
             can.Message(arbitration_id=0x1d0, data=[ # airbag
@@ -267,17 +253,6 @@ while True:
                 0,0,0,0,0,0,0,0], is_extended_id=False),
             can.Message(arbitration_id=0x278, data=[ # red background
                 0,0,0,0,0b00100000,0,0,0], is_extended_id=False),
-
-            
-            can.Message(arbitration_id=0x328, data=[ # radio text
-                0x20, 0x43, 0x00, 0x47, 0x00, 0x45, 0x00, 0x60], is_extended_id=False),
-            can.Message(arbitration_id=0x328, data=[ # radio text
-                0x10, 0x03, 0x00, 0x61, 0x00, 0x43, 0x00, 0x50], is_extended_id=False),
-            can.Message(arbitration_id=0x328, data=[ # radio text
-                0x00, 0x03, 0x00, 0x45, 0x00, 0x44, 0x00, 0x00], is_extended_id=False),
-            can.Message(arbitration_id=0x328, data=[ # radio text
-                0,0,0,0,0,0,0,0], is_extended_id=False),
-
             can.Message(arbitration_id=0x200, data=[ # fuel?
                 0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa], is_extended_id=False),
             can.Message(arbitration_id=0x304, data=[ # tpms
@@ -294,9 +269,6 @@ while True:
                 random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255)], is_extended_id=False),
         ]
         
-        # Update checksums and counters here
-        counter_4bit = (counter_4bit + 1) % 16
-
         # Send Messages
         for message in messages_100ms:
             bus.send(message)
@@ -316,9 +288,7 @@ while True:
             can.Message(arbitration_id=0x170, data=[ # gear
                 random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),gearByte,0], is_extended_id=False),
             can.Message(arbitration_id=0x22d, data=steering_wheel_data, is_extended_id=False), # Trip button
-
         ]
-        # Do checksums here
 
         for message in messages_10ms:
             bus.send(message)
@@ -329,15 +299,12 @@ while True:
     elapsed_time_5s = current_time - start_time_5s
     if elapsed_time_5s >= 3:
         id_counter += 1
-        #get message id counter, change it to zero, randomize the correct bit, after 3 seconds of brutefocing make it change it to the next bit
         print(hex(id_counter))
         if id_counter == 0x3ff:
             id_counter = 0x90
         
         start_time_5s = time.time()
 
-
-    
         """
         #EVIC DISPLAY OF SONG NAME
         328 LINE CODES:              +-> 2=Artist, 3=Song Title,
@@ -360,7 +327,4 @@ while True:
         can0  RX - -  328   [8]  00 00 00 00 00 00 00 00   '........' <--END OF MESSAGE
 
             Always transmit 8 bytes. Use "00" for any unused characters.
-"""
-receive_thread.join()
-
-sock.close()
+        """
