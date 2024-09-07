@@ -11,7 +11,7 @@ class CanBruteForcer(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("CAN Brute-Force Tool")
-        self.geometry("450x500")
+        self.geometry("600x700")  # Increased size for the new buttons
 
         # Variables for ID and data brute-forcing
         self.current_id = 0x000
@@ -22,6 +22,7 @@ class CanBruteForcer(tk.Tk):
         self.last_bit_change_time = time.time()
         self.last_send_time = time.time()
         self.auto_increment = tk.BooleanVar(value=True)  # Variable for auto increment checkbox
+        self.bit_states = [[0] * 8 for _ in range(8)]  # 8 bytes of 8 bits each, all initialized to 0
 
         # GUI Elements
         self.create_widgets()
@@ -61,6 +62,19 @@ class CanBruteForcer(tk.Tk):
         self.output_text = tk.Text(self, height=10, width=60)  # Wider output box
         self.output_text.pack(pady=10)
 
+        # Bit Toggle Frame
+        self.bit_toggle_frame = ttk.LabelFrame(self, text="Bit Toggle Controls")
+        self.bit_toggle_frame.pack(pady=10)
+
+        # Create Bit Toggle Buttons
+        self.bit_toggle_buttons = [[None for _ in range(8)] for _ in range(8)]
+        for byte_index in range(8):
+            for bit_index in range(8):
+                btn = ttk.Button(self.bit_toggle_frame, text=f"Byte {byte_index} Bit {bit_index}", width=12,
+                                 command=lambda b=byte_index, bi=bit_index: self.toggle_bit(b, bi))
+                btn.grid(row=byte_index, column=bit_index, padx=2, pady=2)
+                self.bit_toggle_buttons[byte_index][bit_index] = btn
+
     def toggle_bruteforce(self):
         if not self.running:
             self.running = True
@@ -97,15 +111,14 @@ class CanBruteForcer(tk.Tk):
             time.sleep(0.01)  # Small sleep to prevent high CPU usage
 
     def send_can_message(self):
-        # Create a message with randomized data
+        # Create a message with the current bit states
         data = [0] * 8
-        if self.toggle_state:
-            data[self.current_byte_index] |= (1 << self.current_bit_position)  # Set the bit
-        else:
-            data[self.current_byte_index] &= ~(1 << self.current_bit_position)  # Clear the bit
-
-        # Toggle the bit state
-        self.toggle_state = not self.toggle_state
+        for byte_index in range(8):
+            for bit_index in range(8):
+                if self.bit_states[byte_index][bit_index] == 1:
+                    data[byte_index] |= (1 << bit_index)
+                else:
+                    data[byte_index] &= ~(1 << bit_index)
 
         # Create a CAN message
         message = can.Message(arbitration_id=self.current_id, data=data, is_extended_id=False)
@@ -116,6 +129,11 @@ class CanBruteForcer(tk.Tk):
             self.output_text.see(tk.END)
         except can.CanError as e:
             self.output_text.insert(tk.END, f"CAN Error: {str(e)}\n")
+
+    def toggle_bit(self, byte_index, bit_index):
+        # Toggle the state of the specified bit
+        self.bit_states[byte_index][bit_index] ^= 1  # Flip the bit (0 -> 1, 1 -> 0)
+        self.output_text.insert(tk.END, f"Toggled Byte {byte_index} Bit {bit_index} to {self.bit_states[byte_index][bit_index]}\n")
 
     def update_bit_position(self):
         # Move to the next bit position

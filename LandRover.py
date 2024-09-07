@@ -17,8 +17,8 @@ sock.bind(('127.0.0.1', 4567))
 start_time_100ms = time.time()
 start_time_10ms = time.time()
 start_time_5s = time.time()
-
-id_counter = 0
+#0x3de
+id_counter = 0x2d6
 counter_4bit = 0
 
 ignition = True
@@ -42,6 +42,8 @@ cruise_control_speed = 0
 handbrake = False
 sport_mode = False
 outside_temp = 72
+iat = 85
+oil_pressure = 50
 
 foglight = False
 rear_foglight = False
@@ -58,8 +60,14 @@ passenger_rear_door = False
 
 airbag = False
 seatbelt = False
-sos_call = False
 
+abs_active = False
+abs_fault = False
+
+front_right_tire = 28
+front_left_tire = 29
+rear_left_tire = 30
+rear_right_tire = 31
 # Global variable for steering wheel control data
 steering_wheel_data = [0,0,0,0,0,0,0,0]
 
@@ -119,10 +127,91 @@ def receive():
 
 receive_thread = threading.Thread(target=receive)    
 receive_thread.start()
+def format_text_to_can_chunks(text, input):
+    firstline = True
+    # Convert each character to its ASCII hex representation interleaved with "00"
+    formatted_text = [f"00 {ord(char):02X}" for char in text]
+    
+    # Flatten list into a single array of hex numbers
+    formatted_text = ' '.join(formatted_text).split()
+
+    # Each chunk should fit in 6 hex values (3 characters)
+    chunks = [formatted_text[i:i + 6] for i in range(0, len(formatted_text), 6)]
+
+    # Create CAN message chunks with the start_byte and a line code that increments by 0x10 each message
+    can_chunks = []
+
+    #up until here, it works and generates data[2]-[7] correctly.
+    start_byte = len(chunks)
+    for i, chunk in enumerate(chunks):
+        # Start byte with the incremented line code
+        can_data = [(start_byte - (i+1))*0x10]
+
+        can_data.append((firstline*0x40)+input)
+        # Add up to 6 hex values to fit within 8 bytes total, padding with 0 if necessary
+        can_data.extend(int(chunk[j], 16) if j < len(chunk) else 0 for j in range(6))
+        firstline = False
+        can_chunks.append(can_data[:8])  # Ensure each CAN message is exactly 8 bytes
+
+    # Add an end-of-message frame (all zeros)
+    can_chunks.append([0x00] * 8)
+    print(can_chunks)
+    return can_chunks
+
+def send_can_messages(bus, can_id, chunks):
+    """
+    Send a list of CAN messages on a specific CAN ID.
+    
+    Args:
+        bus (can.Bus): The CAN bus instance.
+        can_id (int): The CAN ID to use for sending messages.
+        chunks (list): A list of 8-byte chunks to be sent.
+    """
+    for chunk in chunks:
+        message = can.Message(arbitration_id=can_id, data=chunk, is_extended_id=False)
+        try:
+            bus.send(message)
+
+            print(f"Message sent: {message}")
+        except can.CanError as e:
+            print(f"Failed to send message: {e}")
+
+def send_display_text(bus, text, text_type='artist'):
+
+    if text_type == 'artist':
+        start_byte = 0x02  # Artist
+    elif text_type == 'song':
+        start_byte = 0x03  # Song Title
+    elif text_type == 'input':
+        start_byte = 0x01  # Radio Input Name
+    else:
+        raise ValueError("Invalid text type. Use 'artist', 'song', or 'input'.")
+    
+    # Format the text into CAN message chunks
+    can_chunks = format_text_to_can_chunks(text, start_byte)
+    
+    # Send the formatted CAN messages
+    send_can_messages(bus, 0x328, can_chunks)
+
 
 while True:
     current_time = time.time()
-    
+    #print(gearSelector)
+    match gearSelector:
+            case b'D':
+                gearByte = 0x08
+            case b'N':
+                gearByte = 0x06
+            case b'0':
+                gearByte = 0x06
+            case b'R':
+                gearByte = 0x04
+            case b'-':
+                gearByte = 0x04
+            case b'P':
+                gearByte = 0x02
+            case _:
+                gearByte = 0x0a
     # Read from the socket if there is data to be read
     ready_to_read, _, _ = select.select([sock], [], [], 0)
     if sock in ready_to_read:
@@ -159,32 +248,48 @@ while True:
     elapsed_time_100ms = current_time - start_time_100ms
     if elapsed_time_100ms >= 0.1:
         date = datetime.now()
-        match gearSelector:
-            case b'N':
-                gearByte = 2
-            case b'R':
-                gearByte = 1
-            case b'P':
-                gearByte = 0
-            case _:
-                gearByte = 3
+        send_display_text(bus, "EyePhone69", text_type="input")
+        send_display_text(bus, "NiggasAndJews", text_type="song")
+
+
         messages_100ms = [
             
 
             can.Message(arbitration_id=0x112, data=[ # ign
-                ignition*0x4,0,0,0,0,0,0,0], is_extended_id=False),
+                (ignition*0x4)+0b10000000,0], is_extended_id=False),
             can.Message(arbitration_id=0x1d0, data=[ # airbag
                 0,0,0,0,0,0,0,0], is_extended_id=False),
+            can.Message(arbitration_id=0x12c, data=[ # power steering
+                0,0,0,0,0,0,0,0], is_extended_id=False),
             can.Message(arbitration_id=0x180, data=[ # battery light
+                iat,int(coolant_temp *1.1)+32,0,0,0,0,0,0], is_extended_id=False),
+            can.Message(arbitration_id=0x22f, data=[ # electronic throttle control
                 0,0,0,0,0,0,0,0], is_extended_id=False),
-            can.Message(arbitration_id=0x2e0, data=[ # esc
-                0,0,0,0,0,0,tc_off*8,(abs_active*8)+(not abs_fault*4)], is_extended_id=False),
-            can.Message(arbitration_id=0x330, data=[ # tc
+            can.Message(arbitration_id=0x278, data=[ # red background
+                0,0,0,0,0b00100000,0,0,0], is_extended_id=False),
+
+            
+            can.Message(arbitration_id=0x328, data=[ # radio text
+                0x20, 0x43, 0x00, 0x47, 0x00, 0x45, 0x00, 0x60], is_extended_id=False),
+            can.Message(arbitration_id=0x328, data=[ # radio text
+                0x10, 0x03, 0x00, 0x61, 0x00, 0x43, 0x00, 0x50], is_extended_id=False),
+            can.Message(arbitration_id=0x328, data=[ # radio text
+                0x00, 0x03, 0x00, 0x45, 0x00, 0x44, 0x00, 0x00], is_extended_id=False),
+            can.Message(arbitration_id=0x328, data=[ # radio text
                 0,0,0,0,0,0,0,0], is_extended_id=False),
-            can.Message(arbitration_id=0x2a0, data=[ # mil
-                check_engine,0,0,id_counter,0,0,0,0], is_extended_id=False),
+
+            can.Message(arbitration_id=0x200, data=[ # fuel?
+                0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa], is_extended_id=False),
+            can.Message(arbitration_id=0x304, data=[ # tpms
+                lowpressure,0,0,front_left_tire,front_right_tire,rear_left_tire,rear_right_tire,35], is_extended_id=False),
+            can.Message(arbitration_id=0x2a0, data=[ # mil, im not even gonna pretend to know what this equation does
+                check_engine,0,oil_pressure,int(round(0x00 + (oil_temp + 40) * (0xC8 - 0x00) / (160 - (-40)))) if -40 <= oil_temp <= 160 else (0x00 if oil_temp < -40 else 0xC8),0,0,0,0], is_extended_id=False),
             can.Message(arbitration_id=0x334, data=[ # lights
-                foglight*4,0,handbrake*128,(left_directional*64)+(right_directional*128),0,0,240,highbeam*4], is_extended_id=False),
+                foglight*4,lowbeam,handbrake*128,(left_directional*64)+(right_directional*128),0,0,240,highbeam*4], is_extended_id=False),
+            can.Message(arbitration_id=0x3e1, data=[ # coolant enable (vehicle deatils bitmap)
+                0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa], is_extended_id=False),
+            can.Message(arbitration_id=0x330, data=[ # tc
+                200,0,0,0,0,0,0,0], is_extended_id=False),
             can.Message(arbitration_id=id_counter, data=[
                 random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255)], is_extended_id=False),
         ]
@@ -204,8 +309,12 @@ while True:
         messages_10ms = [
             can.Message(arbitration_id=0x108, data=[ # rpm
                 int(rpm)>>8,int(rpm)&0xff,0,0,0,0,0,0], is_extended_id=False),
+            can.Message(arbitration_id=0x2e0, data=[ # esc. mpg
+                0,0,0,0,0x0e,0xcc,tc_off*8,(abs_active*8)+(abs_fault*4)+(tc_active*2)], is_extended_id=False),
             can.Message(arbitration_id=0x11c, data=[ # speed
-                0,0,0,0,int(speed*1.8),0,0,0], is_extended_id=False),
+                0,0,0,0,int(speed*1.8),0,random.randint(0,255),random.randint(0,255)], is_extended_id=False),
+            can.Message(arbitration_id=0x170, data=[ # gear
+                random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),gearByte,0], is_extended_id=False),
             can.Message(arbitration_id=0x22d, data=steering_wheel_data, is_extended_id=False), # Trip button
 
         ]
@@ -218,15 +327,40 @@ while True:
 
     # Execute code every 5s
     elapsed_time_5s = current_time - start_time_5s
-    if elapsed_time_5s >= 1:
+    if elapsed_time_5s >= 3:
         id_counter += 1
         #get message id counter, change it to zero, randomize the correct bit, after 3 seconds of brutefocing make it change it to the next bit
         print(hex(id_counter))
-        if id_counter == 0x7ff:
-            id_counter = 0
+        if id_counter == 0x3ff:
+            id_counter = 0x90
         
         start_time_5s = time.time()
 
+
+    
+        """
+        #EVIC DISPLAY OF SONG NAME
+        328 LINE CODES:              +-> 2=Artist, 3=Song Title,
+                                     |   1=Radio Input Name
+              4=Start of new line---+|
+        Lines remaining----------+  ||
+                                 |  ||
+        can0  RX - -  328   [8]  30 42 00 42 00 6C 00 75   '0B.B.l.u' <--Artist
+        can0  RX - -  328   [8]  20 02 00 65 00 46 00 6F   ' ..e.F.o'
+        can0  RX - -  328   [8]  10 02 00 78 00 4D 00 75   '...x.M.u'
+        can0  RX - -  328   [8]  00 02 00 73 00 69 00 63   '...s.i.c'
+        can0  RX - -  328   [8]  00 00 00 00 00 00 00 00   '........' <--END OF MESSAGE
+
+        can0  RX - -  328   [8]  50 43 00 45 00 6C 00 65   'PC.E.l.e' <--Song Title
+        can0  RX - -  328   [8]  40 03 00 63 00 74 00 72   '@..c.t.r'
+        can0  RX - -  328   [8]  30 03 00 6F 00 20 00 50   '0..o. .P'
+        can0  RX - -  328   [8]  20 03 00 65 00 72 00 66   ' ..e.r.f'
+        can0  RX - -  328   [8]  10 03 00 65 00 63 00 74   '...e.c.t' <--TOO MANY CHARS
+        can0  RX - -  328   [8]  00 03 00 6F 00 00 00 00   '...o....' <--WILL NOT SHOW
+        can0  RX - -  328   [8]  00 00 00 00 00 00 00 00   '........' <--END OF MESSAGE
+
+            Always transmit 8 bytes. Use "00" for any unused characters.
+"""
 receive_thread.join()
 
 sock.close()
