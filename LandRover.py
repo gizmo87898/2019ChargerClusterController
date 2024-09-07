@@ -18,7 +18,7 @@ start_time_100ms = time.time()
 start_time_10ms = time.time()
 start_time_5s = time.time()
 #0x3de
-id_counter = 0x2d6
+id_counter = 0
 counter_4bit = 0
 
 ignition = True
@@ -155,7 +155,6 @@ def format_text_to_can_chunks(text, input):
 
     # Add an end-of-message frame (all zeros)
     can_chunks.append([0x00] * 8)
-    print(can_chunks)
     return can_chunks
 
 def send_can_messages(bus, can_id, chunks):
@@ -163,7 +162,7 @@ def send_can_messages(bus, can_id, chunks):
         message = can.Message(arbitration_id=can_id, data=chunk, is_extended_id=False)
         try:
             bus.send(message)
-            wpt.sleep(0.001)
+            #print(message)
         except can.CanError as e:
             print(f"Failed to send message: {e}")
 
@@ -236,7 +235,7 @@ while True:
     elapsed_time_100ms = current_time - start_time_100ms
     if elapsed_time_100ms >= 0.1:
         date = datetime.now()
-
+        fuelvalue = int(fuel * 2.55)
         send_display_text(bus, "EyePhone69", text_type="input")
         send_display_text(bus, "NiggasAndJews", text_type="song")
 
@@ -253,8 +252,8 @@ while True:
                 0,0,0,0,0,0,0,0], is_extended_id=False),
             can.Message(arbitration_id=0x278, data=[ # red background
                 0,0,0,0,0b00100000,0,0,0], is_extended_id=False),
-            can.Message(arbitration_id=0x200, data=[ # fuel?
-                0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa], is_extended_id=False),
+            can.Message(arbitration_id=0x200, data=[ # fuel
+                0xa4,0x1c,0x0b,0x52,0x02+(fuelvalue&0xf),0x0a+(fuelvalue>>4),0x79,0xff], is_extended_id=False),
             can.Message(arbitration_id=0x304, data=[ # tpms
                 lowpressure,0,0,front_left_tire,front_right_tire,rear_left_tire,rear_right_tire,35], is_extended_id=False),
             can.Message(arbitration_id=0x2a0, data=[ # mil, im not even gonna pretend to know what this equation does
@@ -263,8 +262,18 @@ while True:
                 foglight*4,lowbeam,handbrake*128,(left_directional*64)+(right_directional*128),0,0,240,highbeam*4], is_extended_id=False),
             can.Message(arbitration_id=0x3e1, data=[ # coolant enable (vehicle deatils bitmap)
                 0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa], is_extended_id=False),
+            can.Message(arbitration_id=0x3e8, data=[ #  vehicle deatils bitmap -- -FROM A CHALLENGER R/T manual i think
+                0x49,0x2c,0x22,0x21,0xbe,0x9e,0x13,0x10], is_extended_id=False),
+            can.Message(arbitration_id=0x3ea, data=[ #  vehicle deatils bitmap -- -FROM A CHALLENGER R/T
+                0x41,0x40,0x22,0x2b,0xcd,0x24,0x03,0xfc], is_extended_id=False),
+            can.Message(arbitration_id=0x3eb, data=[ #  vehicle deatils bitmap -- -FROM A CHALLENGER R/T
+                0x40,0x00,0x0c,0x05,0x00,0x00,0x08,0xbb], is_extended_id=False),
+            can.Message(arbitration_id=0x3c9, data=[ #  vehicle deatils bitmap -- -FROM A CHALLENGER R/T
+                0x81,0x48,0x00,0x00], is_extended_id=False),
             can.Message(arbitration_id=0x330, data=[ # tc
                 200,0,0,0,0,0,0,0], is_extended_id=False),
+            can.Message(arbitration_id=0x350, data=[ # time
+                date.second,date.minute,date.hour,4,5,6,7,8], is_extended_id=False),
             can.Message(arbitration_id=id_counter, data=[
                 random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255)], is_extended_id=False),
         ]
@@ -284,7 +293,7 @@ while True:
             can.Message(arbitration_id=0x2e0, data=[ # esc. mpg
                 0,0,0,0,0x0e,0xcc,tc_off*8,(abs_active*8)+(abs_fault*4)+(tc_active*2)], is_extended_id=False),
             can.Message(arbitration_id=0x11c, data=[ # speed
-                0,0,0,0,int(speed*1.8),0,random.randint(0,255),random.randint(0,255)], is_extended_id=False),
+                0x80,0,0,0,int(speed*1.8),0,0x10,0x66], is_extended_id=False),
             can.Message(arbitration_id=0x170, data=[ # gear
                 random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),gearByte,0], is_extended_id=False),
             can.Message(arbitration_id=0x22d, data=steering_wheel_data, is_extended_id=False), # Trip button
@@ -297,7 +306,7 @@ while True:
 
     # Execute code every 5s
     elapsed_time_5s = current_time - start_time_5s
-    if elapsed_time_5s >= 3:
+    if elapsed_time_5s >= 10:
         id_counter += 1
         print(hex(id_counter))
         if id_counter == 0x3ff:
@@ -315,7 +324,7 @@ while True:
         can0  RX - -  328   [8]  30 42 00 42 00 6C 00 75   '0B.B.l.u' <--Artist
         can0  RX - -  328   [8]  20 02 00 65 00 46 00 6F   ' ..e.F.o'
         can0  RX - -  328   [8]  10 02 00 78 00 4D 00 75   '...x.M.u'
-        can0  RX - -  328   [8]  00 02 00 73 00 69 00 63   '...s.i.c'
+        can0  RX - -  328   [8]  00 02 .00 73 00 69 00 63   '...s.i.c'
         can0  RX - -  328   [8]  00 00 00 00 00 00 00 00   '........' <--END OF MESSAGE
 
         can0  RX - -  328   [8]  50 43 00 45 00 6C 00 65   'PC.E.l.e' <--Song Title
