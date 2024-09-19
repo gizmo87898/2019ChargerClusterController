@@ -9,7 +9,7 @@ import tkinter as tk
 import win_precise_time as wpt
 from datetime import datetime
 
-bus = can.interface.Bus(channel='com7', bustype='seeedstudio', bitrate=500000)
+bus = can.interface.Bus(channel='com6', bustype='seeedstudio', bitrate=500000)
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind(('127.0.0.1', 4567))
     
@@ -18,7 +18,8 @@ start_time_100ms = time.time()
 start_time_10ms = time.time()
 start_time_5s = time.time()
 #0x3de
-id_counter = 0
+id_counter = 0x3e0
+random_data = [0,0,0,0,0,0,0,0]
 counter_4bit = 0
 
 ignition = True
@@ -80,6 +81,15 @@ def gui_thread():
         global steering_wheel_data
         steering_wheel_data = [0,0,0,0,0,0,0,0]
 
+    def set_random_data(data):
+        global random_data
+        random_data = data
+        print(random_data)
+
+    def reset_random_data(event):
+        global random_data
+        random_data = [0,0,0,0,0,0,0,0]
+
     root = tk.Tk()
     root.title("LandRoverLR2")
 
@@ -112,6 +122,10 @@ def gui_thread():
     button_down.bind("<ButtonPress>", lambda event: set_steering_wheel_data([0, 0, 0, 0, 0b01000000, 0, 0, 0]))
     button_down.bind("<ButtonRelease>", reset_steering_wheel_data)
     button_down.grid(row=2, column=1, padx=5, pady=5)
+
+    button_rand = tk.Button(root, text="Randomize")
+    button_rand.bind("<ButtonPress>", lambda event: set_random_data([random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255)]))
+    button_rand.grid(row=2, column=2, padx=5, pady=5)
 
     root.mainloop()
 # Start the GUI thread
@@ -260,22 +274,23 @@ while True:
                 check_engine,0,oil_pressure,int(round(0x00 + (oil_temp + 40) * (0xC8 - 0x00) / (160 - (-40)))) if -40 <= oil_temp <= 160 else (0x00 if oil_temp < -40 else 0xC8),0,0,0,0], is_extended_id=False),
             can.Message(arbitration_id=0x334, data=[ # lights
                 foglight*4,lowbeam,handbrake*128,(left_directional*64)+(right_directional*128),0,0,240,highbeam*4], is_extended_id=False),
-            can.Message(arbitration_id=0x3e1, data=[ # coolant enable (vehicle deatils bitmap)
-                0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa], is_extended_id=False),
-            can.Message(arbitration_id=0x3e8, data=[ #  vehicle deatils bitmap -- -FROM A CHALLENGER R/T manual i think
-                0x49,0x2c,0x22,0x21,0xbe,0x9e,0x13,0x10], is_extended_id=False),
-            can.Message(arbitration_id=0x3ea, data=[ #  vehicle deatils bitmap -- -FROM A CHALLENGER R/T
-                0x41,0x40,0x22,0x2b,0xcd,0x24,0x03,0xfc], is_extended_id=False),
-            can.Message(arbitration_id=0x3eb, data=[ #  vehicle deatils bitmap -- -FROM A CHALLENGER R/T
-                0x40,0x00,0x0c,0x05,0x00,0x00,0x08,0xbb], is_extended_id=False),
-            can.Message(arbitration_id=0x3c9, data=[ #  vehicle deatils bitmap -- -FROM A CHALLENGER R/T
-                0x81,0x48,0x00,0x00], is_extended_id=False),
-            can.Message(arbitration_id=0x330, data=[ # tc
-                200,0,0,0,0,0,0,0], is_extended_id=False),
-            can.Message(arbitration_id=0x350, data=[ # time
-                date.second,date.minute,date.hour,4,5,6,7,8], is_extended_id=False),
-            can.Message(arbitration_id=id_counter, data=[
-                random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255),random.randint(0,255)], is_extended_id=False),
+            #can.Message(arbitration_id=0x3e1, data=[ # coolant enable (vehicle deatils bitmap) manual/auto bitmap for messages
+            #    118,48,80,113,0x00,0x00,0x00,0xaa], is_extended_id=False),
+            #can.Message(arbitration_id=0x3e4, data=[ # active dampening/ blindspot detection/ acc/fcw
+            #    0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa,0xaa], is_extended_id=False),
+            #can.Message(arbitration_id=0x3e8, data=[ #  vehicle deatils bitmap -- background red, bar/psi, gear appear/disappear, can get gear to stop blinking, SPEED WARNING 120??
+            #    0x49,0x2c,0x22,0x21,0xbe,0x9e,0x13,0x10], is_extended_id=False),
+            #can.Message(arbitration_id=0x3ea, data=[ #  vehicle deatils bitmap -- font of everything, changes from h/c to temps, 
+            #    0x41,0x40,0x22,0x2b,0xcd,0x24,0x03,0xfc], is_extended_id=False),
+            #can.Message(arbitration_id=0x3eb, data=[ #  vehicle deatils bitmap -- -FROM A CHALLENGER R/T
+            #    0x40,0x00,0x0c,0x05,0x00,0x00,0x08,0xbb], is_extended_id=False),
+            #can.Message(arbitration_id=0x3c9, data=[ #  vehicle deatils bitmap -- -FROM A CHALLENGER R/T
+            #    0x81,0x48,0x00,0x00], is_extended_id=False),
+            #can.Message(arbitration_id=0x330, data=[ # tc
+            #    200,0,0,0,0,0,0,0], is_extended_id=False),
+            #can.Message(arbitration_id=0x350, data=[ # time
+            #    date.second,date.minute,date.hour,4,5,6,7,8], is_extended_id=False),
+            can.Message(arbitration_id=id_counter, data=random_data, is_extended_id=False),
         ]
         
         # Send Messages
@@ -290,7 +305,7 @@ while True:
         messages_10ms = [
             can.Message(arbitration_id=0x108, data=[ # rpm
                 int(rpm)>>8,int(rpm)&0xff,0,0,0,0,0,0], is_extended_id=False),
-            can.Message(arbitration_id=0x2e0, data=[ # esc. mpg
+            can.Message(arbitration_id=0x2e0, data=[ # esc, mpg
                 0,0,0,0,0x0e,0xcc,tc_off*8,(abs_active*8)+(abs_fault*4)+(tc_active*2)], is_extended_id=False),
             can.Message(arbitration_id=0x11c, data=[ # speed
                 0x80,0,0,0,int(speed*1.8),0,0x10,0x66], is_extended_id=False),
@@ -310,10 +325,21 @@ while True:
         id_counter += 1
         print(hex(id_counter))
         if id_counter == 0x3ff:
-            id_counter = 0x90
+            id_counter = 0x0
+        '''
+        rpm = random.randint(0,7000)
+        speed = random.randint(0,80)
+        abs_active = not abs_active
+        tc_active = not tc_active
+        left_directional = not left_directional
+        right_directional = not right_directional
+        check_engine = not check_engine
+        handbrake = not handbrake
+        highbeam = not highbeam
+        lowbeam = not lowbeam
         
+        '''
         start_time_5s = time.time()
-
         """
         #EVIC DISPLAY OF SONG NAME
         328 LINE CODES:              +-> 2=Artist, 3=Song Title,

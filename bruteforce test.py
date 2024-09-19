@@ -5,7 +5,7 @@ import threading
 import time
 
 # Setup CAN interface
-bus = can.interface.Bus(channel='com7', bustype='seeedstudio', bitrate=500000)
+bus = can.interface.Bus(channel='com6', bustype='seeedstudio', bitrate=500000)
 
 class CanBruteForcer(tk.Tk):
     def __init__(self):
